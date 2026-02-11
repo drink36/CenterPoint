@@ -9,6 +9,8 @@
 #include <thrust/transform.h>
 #include <thrust/count.h>
 #include <config.h>
+#include <thrust/unique.h>
+#include <thrust/copy.h>  
 #include <preprocess.h>
 #define DIVUP(m, n) ((m) / (n) + ((m) % (n) > 0))
 

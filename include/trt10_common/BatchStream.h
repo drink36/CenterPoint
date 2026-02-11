@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 1993-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +19,9 @@
 
 #include "NvInfer.h"
 #include "common.h"
-#include "logger.h"
 #include <algorithm>
 #include <stdio.h>
 #include <vector>
-#include "config.h"
-// #include "utils.h"
-
 
 class IBatchStream
 {
@@ -33,153 +30,11 @@ public:
     virtual bool next() = 0;
     virtual void skip(int skipCount) = 0;
     virtual float* getBatch() = 0;
-    // virtual float* getLabels() = 0;
+    virtual float* getLabels() = 0;
     virtual int getBatchesRead() const = 0;
     virtual int getBatchSize() const = 0;
     virtual nvinfer1::Dims getDims() const = 0;
 };
-
-class PFEBatchStream : public IBatchStream
-{
-public:
-    PFEBatchStream(const std::string directory)
-        : mBatchSize{1} // we only execute batch size to be 1
-        , mDims{3, {MAX_PILLARS, MAX_PIONT_IN_PILLARS, FEATURE_NUM}} //!< We already know the dimensions of Voxels 
-    {
-            // initialize  mData
-            int elementNum = MAX_PILLARS * MAX_PIONT_IN_PILLARS * FEATURE_NUM;
-            // mData = static_cast<float*>(malloc(  elementNum* sizeof(float)));
-            // if(mData.data() == nullptr){
-            //     sample::gLogError << "PFE Calib Input Data Malloc Memory Failed! Size: " << elementNum << std::endl;
-            //     return ;
-            // }
-            // memset(mData, 0 , elementNum * sizeof(float));
-            // get file paths
-            // filePaths = glob(directory);
-            filePaths = {
-            "/mnt/data/waymo_opensets/val/calibrations/seq_0_frame_0_pfe_input.npy",
-            "/mnt/data/waymo_opensets/val/calibrations/seq_0_frame_1_pfe_input.npy",
-            "/mnt/data/waymo_opensets/val/calibrations/seq_0_frame_2_pfe_input.npy",
-            "/mnt/data/waymo_opensets/val/calibrations/seq_0_frame_3_pfe_input.npy",
-            "/mnt/data/waymo_opensets/val/calibrations/seq_0_frame_4_pfe_input.npy"
-            };
-            std::string filename_ = "/home/wanghao/Desktop/projects/CenterPoint/tensorrt/data/calibdata5.bin";
-            readDataFile(filename_);
-            mMaxBatches = filePaths.size() / mBatchSize;
-        // readDataFile(locateFile(dataFile, directories));
-        // readLabelsFile(locateFile(labelsFile, directories));
-    }
-
-    ~PFEBatchStream() 
-    {
-        // free(mData);
-    }
-
-    void reset(int firstBatch) override
-    {
-        mBatchCount = firstBatch;
-    }
-
-    bool next() override
-    {
-        if (mBatchCount >= mMaxBatches)
-        {
-            return false;
-        }
-        ++mBatchCount;
-        return true;
-    }
-
-    void skip(int skipCount) override
-    {
-        mBatchCount += skipCount;
-    }
-
-    float* getBatch() override
-    {
-        // std::string cur_file_path = filePaths[mBatchCount];
-        // readDataFile(cur_file_path);
-        // return mData;
-        int stride = mBatchCount * mBatchSize * samplesCommon::volume(mDims);
-        return mData.data() + stride;
-        
-    }
-
-    // float* getLabels() override
-    // {
-    //     return mData;
-    // }
-
-    int getBatchesRead() const override
-    {
-        return mBatchCount;
-    }
-
-    int getBatchSize() const override
-    {
-        return mBatchSize;
-    }
-
-    nvinfer1::Dims getDims() const override
-    {
-        return Dims{3, {mDims.d[0], mDims.d[1], mDims.d[2]}};
-    }
-
-private:
-
-    void readDataFile(std::string& filename)
-    {
-        // open the file:
-        std::streampos fileSize;
-        std::ifstream file(filename, std::ios::binary);
-        
-        if (!file) {
-            sample::gLogError << "[Error] Open file " << filename << " failed" << std::endl;
-            return ;
-        }
-        // get its size:
-        file.seekg(0, std::ios::end);
-        fileSize = file.tellg();
-        int elementNum = MAX_PILLARS * MAX_PIONT_IN_PILLARS * FEATURE_NUM;
-        file.seekg(0, std::ios::beg);
-        // assert(fileSize / sizeof(float)  == elementNum && "calibration data size needs to be consistance with params defined by config.h !");
-        // read the data:
-        // void* rawData=nullptr;
-        // rawData = malloc(fileSize);
-        // file.read((char*) rawData, fileSize);
-        // file.close();
-        // mData = static_cast<float*>(rawData);
-        // free(rawData);
-        mData.resize(elementNum * 5);
-        // std::vector<float> rawData(5 * elementNum);
-        // file.read(reinterpret_cast<char*>(rawData.data()), numElements * sizeof(float) * 5);
-        file.read(reinterpret_cast<char*>(mData.data()), elementNum * sizeof(float) * 5);
-        // std::transform(
-        //     rawData.begin(), rawData.end(), mData.begin(), [](uint8_t val) { return static_cast<float>(val) / 255.f; });
-        std::cout << "file size " << fileSize/sizeof(float) << std::endl;
-
-    }
-
-    int mBatchSize{0};
-    int mBatchCount{0}; //!< The batch that will be read on the next invocation of next()
-    int mMaxBatches{0};
-    Dims mDims{};
-    std::vector<std::string> filePaths;
-    // float* mData;
-    std::vector<float> mData = {};
-
-};
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
 
 class MNISTBatchStream : public IBatchStream
 {
@@ -219,10 +74,10 @@ public:
         return mData.data() + (mBatchCount * mBatchSize * samplesCommon::volume(mDims));
     }
 
-    // float* getLabels() override
-    // {
-    //     return mLabels.data() + (mBatchCount * mBatchSize);
-    // }
+    float* getLabels() override
+    {
+        return mLabels.data() + (mBatchCount * mBatchSize);
+    }
 
     int getBatchesRead() const override
     {
@@ -236,7 +91,7 @@ public:
 
     nvinfer1::Dims getDims() const override
     {
-        return Dims{4, {mBatchSize, mDims.d[0], mDims.d[1], mDims.d[2]}};
+        return nvinfer1::Dims{4, {mBatchSize, mDims.d[0], mDims.d[1], mDims.d[2]}};
     }
 
 private:
@@ -265,7 +120,7 @@ private:
         file.read(reinterpret_cast<char*>(rawData.data()), numElements * sizeof(uint8_t));
         mData.resize(numElements);
         std::transform(
-            rawData.begin(), rawData.end(), mData.begin(), [](uint8_t val) { return static_cast<float>(val) / 255.f; });
+            rawData.begin(), rawData.end(), mData.begin(), [](uint8_t val) { return static_cast<float>(val) / 255.F; });
     }
 
     void readLabelsFile(const std::string& labelsFilePath)
@@ -290,55 +145,47 @@ private:
     int mBatchSize{0};
     int mBatchCount{0}; //!< The batch that will be read on the next invocation of next()
     int mMaxBatches{0};
-    Dims mDims{};
+    nvinfer1::Dims mDims{};
     std::vector<float> mData{};
     std::vector<float> mLabels{};
 };
 
-
-
-
-
-
 class BatchStream : public IBatchStream
 {
 public:
-    BatchStream(
-        int batchSize, int maxBatches, std::string prefix, std::string suffix, std::vector<std::string> directories)
+    BatchStream(int batchSize, int maxBatches, std::string const& prefix, std::string const& suffix,
+        std::vector<std::string> const& directories)
         : mBatchSize(batchSize)
         , mMaxBatches(maxBatches)
         , mPrefix(prefix)
         , mSuffix(suffix)
         , mDataDir(directories)
     {
-        FILE* file = fopen(locateFile(mPrefix + std::string("0") + mSuffix, mDataDir).c_str(), "rb");
-        ASSERT(file != nullptr);
+        std::ifstream file(locateFile(mPrefix + std::string("0") + mSuffix, mDataDir).c_str(), std::ios::binary);
+        ASSERT(file.good());
         int d[4];
-        size_t readSize = fread(d, sizeof(int), 4, file);
-        ASSERT(readSize == 4);
+        file.read(reinterpret_cast<char*>(d), 4 * sizeof(int32_t));
         mDims.nbDims = 4;  // The number of dimensions.
         mDims.d[0] = d[0]; // Batch Size
         mDims.d[1] = d[1]; // Channels
         mDims.d[2] = d[2]; // Height
         mDims.d[3] = d[3]; // Width
         ASSERT(mDims.d[0] > 0 && mDims.d[1] > 0 && mDims.d[2] > 0 && mDims.d[3] > 0);
-        fclose(file);
 
         mImageSize = mDims.d[1] * mDims.d[2] * mDims.d[3];
         mBatch.resize(mBatchSize * mImageSize, 0);
         mLabels.resize(mBatchSize, 0);
         mFileBatch.resize(mDims.d[0] * mImageSize, 0);
         mFileLabels.resize(mDims.d[0], 0);
-        reset(0);
     }
 
-    BatchStream(int batchSize, int maxBatches, std::string prefix, std::vector<std::string> directories)
+    BatchStream(int batchSize, int maxBatches, std::string const& prefix, std::vector<std::string> const& directories)
         : BatchStream(batchSize, maxBatches, prefix, ".batch", directories)
     {
     }
 
-    BatchStream(
-        int batchSize, int maxBatches, nvinfer1::Dims dims, std::string listFile, std::vector<std::string> directories)
+    BatchStream(int batchSize, int maxBatches, nvinfer1::Dims const& dims, std::string const& listFile,
+        std::vector<std::string> const& directories)
         : mBatchSize(batchSize)
         , mMaxBatches(maxBatches)
         , mDims(dims)
@@ -350,7 +197,6 @@ public:
         mLabels.resize(mBatchSize, 0);
         mFileBatch.resize(mDims.d[0] * mImageSize, 0);
         mFileLabels.resize(mDims.d[0], 0);
-        reset(0);
     }
 
     // Resets data members
@@ -370,22 +216,19 @@ public:
             return false;
         }
 
-        for (int csize = 1, batchPos = 0; batchPos < mBatchSize; batchPos += csize, mFileBatchPos += csize)
+        for (int64_t csize = 1, batchPos = 0; batchPos < mBatchSize; batchPos += csize, mFileBatchPos += csize)
         {
-            const int64_t filePos = static_cast<int64_t>(mFileBatchPos);
-            const int64_t fileDim0 = static_cast<int64_t>(mDims.d[0]);
-            ASSERT(filePos >= 0 && filePos <= fileDim0);
-            if (filePos == fileDim0 && !update())
+            ASSERT(mFileBatchPos > 0 && mFileBatchPos <= mDims.d[0]);
+            if (mFileBatchPos == mDims.d[0] && !update())
             {
                 return false;
             }
-            auto remainBatch = static_cast<int64_t>(mBatchSize - batchPos);
-            auto remainFile = static_cast<int64_t>(mDims.d[0]) - static_cast<int64_t>(mFileBatchPos);
+
             // copy the smaller of: elements left to fulfill the request, or elements left in the file buffer.
-            csize = static_cast<int>(std::min(remainBatch, remainFile));
+            csize = std::min<int64_t>(mBatchSize - batchPos, mDims.d[0] - mFileBatchPos);
             std::copy_n(
                 getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize, getBatch() + batchPos * mImageSize);
-            // std::copy_n(getFileLabels() + mFileBatchPos, csize, getLabels() + batchPos);
+            std::copy_n(getFileLabels() + mFileBatchPos, csize, getLabels() + batchPos);
         }
         mBatchCount++;
         return true;
@@ -413,10 +256,10 @@ public:
         return mBatch.data();
     }
 
-    // float* getLabels() override
-    // {
-    //     return mLabels.data();
-    // }
+    float* getLabels() override
+    {
+        return mLabels.data();
+    }
 
     int getBatchesRead() const override
     {
@@ -449,22 +292,16 @@ private:
         if (mListFile.empty())
         {
             std::string inputFileName = locateFile(mPrefix + std::to_string(mFileCount++) + mSuffix, mDataDir);
-            FILE* file = fopen(inputFileName.c_str(), "rb");
+            std::ifstream file(inputFileName.c_str(), std::ios::binary);
             if (!file)
             {
                 return false;
             }
-
             int d[4];
-            size_t readSize = fread(d, sizeof(int), 4, file);
-            ASSERT(readSize == 4);
+            file.read(reinterpret_cast<char*>(d), 4 * sizeof(int32_t));
             ASSERT(mDims.d[0] == d[0] && mDims.d[1] == d[1] && mDims.d[2] == d[2] && mDims.d[3] == d[3]);
-            size_t readInputCount = fread(getFileBatch(), sizeof(float), mDims.d[0] * mImageSize, file);
-            ASSERT(readInputCount == size_t(mDims.d[0] * mImageSize));
-            size_t readLabelCount = fread(getFileLabels(), sizeof(float), mDims.d[0], file);
-            ASSERT(readLabelCount == 0 || readLabelCount == size_t(mDims.d[0]));
-
-            fclose(file);
+            file.read(reinterpret_cast<char*>(getFileBatch()), sizeof(float) * mDims.d[0] * mImageSize);
+            file.read(reinterpret_cast<char*>(getFileLabels()), sizeof(float) * mDims.d[0]);
         }
         else
         {
@@ -522,7 +359,7 @@ private:
         return true;
     }
 
-    int mBatchSize{0};
+    int64_t mBatchSize{0};
     int mMaxBatches{0};
     int mBatchCount{0};
     int mFileCount{0};

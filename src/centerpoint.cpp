@@ -161,8 +161,11 @@ bool CenterPoint::constructNetwork(SampleUniquePtr<nvinfer1::IBuilder>& builder,
         sample::gLogError<< "Onnx model cannot be parsed ! " << std::endl;
         return false;
     }
-    builder->setMaxBatchSize(BATCH_SIZE_);
-    config->setMaxWorkspaceSize(5_GiB); //8_GiB);
+    // builder->setMaxBatchSize(BATCH_SIZE_); not sure how to
+    config->setMemoryPoolLimit(
+    nvinfer1::MemoryPoolType::kWORKSPACE,
+    5ULL * 1024 * 1024 * 1024
+    );
     if (mParams.fp16)
         config->setFlag(BuilderFlag::kFP16);
     if (mParams.dlaCore >=0 ){

@@ -1,104 +1,90 @@
-cmake_minimum_required(VERSION 2.8.3)
-project(centerpoint)
+cmake_minimum_required(VERSION 3.18)
+project(centerpoint LANGUAGES CXX CUDA)
+set(CMAKE_DISABLE_FIND_PACKAGE_MPI TRUE)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# =========================
+# CUDA Toolkit
+# =========================
+find_package(CUDAToolkit REQUIRED)
+
+# =========================
+# Boost
+# =========================
+find_package(Boost COMPONENTS program_options REQUIRED)
+
+# =========================
+# PCL
+# =========================
+# find_package(PCL REQUIRED COMPONENTS common io)
+
+# =========================
+# TensorRT
+# =========================
+find_library(NVINFER NAMES nvinfer REQUIRED)
+find_library(NVONNXPARSER NAMES nvonnxparser REQUIRED)
+
+message(STATUS "NVINFER: ${NVINFER}")
+message(STATUS "NVONNXPARSER: ${NVONNXPARSER}")
+
+# =========================
+# Include Directories
+# =========================
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/include/trt10_common
+    ${PROJECT_SOURCE_DIR}/include/utils
+    ${Boost_INCLUDE_DIRS}
+    ${PCL_INCLUDE_DIRS}
 )
 
-set(SAMPLES_COMMON_SOURCES
-${PROJECT_SOURCE_DIR}/include/common/logger.cpp
+# =========================
+# Source Files
+# =========================
+file(GLOB CPP_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB CUDA_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cu)
+
+# =========================
+# pointpillars library (C++)
+# =========================
+add_library(pointpillars SHARED ${CPP_SOURCES})
+
+target_link_libraries(pointpillars
+    ${NVINFER}
+    ${NVONNXPARSER}
+    CUDA::cudart
+    dl
+    pthread
 )
 
+# =========================
+# CUDA library
+# =========================
+add_library(pointpillarsCU SHARED ${CUDA_SOURCES})
 
-# pcl and boost related !
-find_package(Boost COMPONENTS program_options REQUIRED )
-include_directories(${Boost_INCLUDE_DIRS})
-link_directories(${Boost_LIBRARY_DIRS})
- 
-find_package(PCL REQUIRED)
-include_directories(${PCL_INCLUDE_DIRS})
-link_directories(${PCL_LIBRARY_DIRS})
-add_definitions(${PCL_DEFINITIONS})
-
-
-
-# set flags for CUDA availability
-option(CUDA_AVAIL "CUDA available" OFF)
-find_package(CUDA)
-message("CUDA dir paths", ${CUDA_LIBRARIES})
-
-include_directories( 
-  ${PROJECT_SOURCE_DIR}/include/common
-  ${PROJECT_SOURCE_DIR}/include
-  ${CUDA_INCLUDE_DIRS}
-  )
-
-message("CUDA is available!")
-message("CUDA Libs: ${CUDA_LIBRARIES}")
-message("CUDA Headers: ${CUDA_INCLUDE_DIRS}")
-set(CUDA_AVAIL ON)
-
-
-# set flags for TensorRT availability
-option(TRT_AVAIL "TensorRT available" OFF)
-# try to find the tensorRT modules
-find_library(NVINFER NAMES nvinfer)
-find_library(NVPARSERS NAMES nvparsers)
-find_library(NVONNXPARSERS NAMES nvonnxparser)
-
-if(NVINFER AND NVPARSERS AND NVONNXPARSERS)
-  message("TensorRT is available!")
-  message("NVINFER: ${NVINFER}")
-  message("NVPARSERS: ${NVPARSERS}")
-  message("NVONNXPARSERS: ${NVONNXPARSERS}")
-  set(TRT_AVAIL ON)
-else()
-  message("TensorRT is NOT Available")
-  set(TRT_AVAIL OFF)
-endif()
-
-# set flags for CUDNN availability
-option(CUDNN_AVAIL "CUDNN available" OFF)
-# try to find the CUDNN module
-find_library(CUDNN_LIBRARY
-  NAMES libcudnn.so${__cudnn_ver_suffix} libcudnn${__cudnn_ver_suffix}.dylib ${__cudnn_lib_win_name}
-  PATHS $ENV{LD_LIBRARY_PATH} ${__libpath_cudart} ${CUDNN_ROOT_DIR} ${PC_CUDNN_LIBRARY_DIRS} ${CMAKE_INSTALL_PREFIX}
-  PATH_SUFFIXES lib lib64 bin
-  DOC "CUDNN library."
+target_link_libraries(pointpillarsCU
+    CUDA::cudart
 )
 
-if(CUDNN_LIBRARY)
-  message("CUDNN is available!")
-  message("CUDNN_LIBRARY: ${CUDNN_LIBRARY}")
-  set(CUDNN_AVAIL ON)
-else()
-  message("CUDNN is NOT Available")
-  set(CUDNN_AVAIL OFF)
-endif()
+# =========================
+# Executable
+# =========================
+add_executable(centerpoint
+    ${PROJECT_SOURCE_DIR}/src/samplecenterpoint.cpp
+    ${PROJECT_SOURCE_DIR}/include/trt10_common/logger.cpp
+)
 
-
-file(GLOB PointPillarLibs ${PROJECT_SOURCE_DIR}/src/*cpp)
-add_library(pointpillars SHARED ${PointPillarLibs})
-
-file(GLOB PointPillarCU ${PROJECT_SOURCE_DIR}/src/*cu)
-cuda_add_library(pointpillarsCU SHARED ${PointPillarCU})
-
-set(CUDA_LIB_PATH /usr/local/cuda/lib64/)
-
-MESSAGE(${PROJECT_SOURCE_DIR})
-add_executable(centerpoint ${PROJECT_SOURCE_DIR}/src/samplecenterpoint.cpp ${SAMPLES_COMMON_SOURCES})
-
-target_link_libraries(centerpoint 
-                         ${CUDA_LIBRARY} 
-                         ${CUDA_RUNTIME_LIBRARY} 
-                         ${PCL_LIBRARIES}  
-                         ${Boost_LIBRARIES}
-                         nvonnxparser
-                         nvinfer
-                         pointpillars
-                         ${CUDA_LIB_PATH}libcudart.so
-                         pointpillarsCU
-                         )
-
-
+target_link_libraries(centerpoint
+    pointpillars
+    pointpillarsCU
+    ${NVINFER}
+    ${NVONNXPARSER}
+    Boost::program_options
+    ${PCL_COMMON_LIBRARIES}
+    ${PCL_IO_LIBRARIES}
+    CUDA::cudart
+    dl
+    pthread
+)
